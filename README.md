@@ -1,6 +1,6 @@
 # AureliaAtlas
 
-Scripts and files necessary to reproduce the analyses in Link et al. BioRxiv*
+Scripts necessary to reproduce the analyses in Link et al. BioRxiv [https://doi.org/10.1101/2023.08.24.554571]
 
 1) GenerateAaAllData.R : R script for importing mapped count matrices from Cellranger 'out' directory after mapping and generating integrated Seurat R object for analysis
 
