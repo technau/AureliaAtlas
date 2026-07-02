@@ -1,0 +1,397 @@
+---
+title: "Aurelia Atlas | Supplementary Data Figures"
+output: html_document
+---
+
+```{r, setup, include=FALSE}
+# Global chunk options
+knitr::opts_chunk$set(
+  warning = FALSE,
+  message = FALSE,
+  echo = FALSE,
+  fig.width = 12
+)
+setwd("/lisc/data/scratch/molevo/agcole/R/Aurelia_51k/Ac_manuscript_revision_ACOE")
+#load libraries: 
+library(tinytex,quietly = T)
+library(Seurat,quietly=T)
+library(RColorBrewer,quietly=T)
+library(patchwork,quietly=T)
+library(ggplot2,quietly=T)
+library(pals,quietly=T)
+library(readxl,quietly=T)
+library(SeuratWrappers,quietly=T)#,lib.loc = '/lisc/data/scratch/molevo/agcole/R/libs/course24/')
+library(tidyr,quietly=T)
+library(dplyr,quietly = T)
+
+load (file='/lisc/data/scratch/molevo/agcole/R/Aurelia_51k/ac.kostyaPlus/ACOE.genes.RData')
+if(!exists('Ac.Alldata'))
+load(file='Ac.Alldata.Robj')
+
+if(!exists('data1.subsets'))
+load(file='Ac.subsets.RObj')
+genes=genes.ac
+gene.cp = c('lightgrey', rev(brewer.pal(11 , "Spectral")))
+clust.cp.separate = unique (c(cols25(25), glasbey(32), alphabet(26)))
+clust.cp.graded = unique(c(stepped3(20), stepped2(20), stepped(20)))
+
+LibCP = c(stepped3(3),stepped(20)[c(13:16)],stepped(20)[c(11,9)],stepped3(20)[c(5,6)],'red',stepped(20)[c(1,2)],stepped2(20)[c(17,18)])
+Ac.Alldata$orig.ident=as.factor(Ac.Alldata$orig.ident)
+names(LibCP)=levels(as.factor(Ac.Alldata$orig.ident))
+
+LibCP.stages=LibCP[c(1,9,11,16)]
+names(LibCP.stages)=c('polyp','strobila','ephyra','medusa')
+
+neur.cp=rev(c('wheat3','burlywood',stepped(8)[7:8],"#ff7f00",stepped3(8)[5:7],'orange','chocolate','darkkhaki',stepped(12)[9:11],"#33a02c",'green3','forestgreen','darkgreen','darkolivegreen',(stepped2(8)[5:8])))
+
+all.clusters.cp=c("skyblue","#1F78C8","darkblue","seagreen3","#FFD700" ,'goldenrod3','goldenrod1','yellow','goldenrod4',"grey",brewer.greys(14)[6:9],"#ff0000",brewer.reds(6)[3:6],neur.cp,"#FB6496",brewer.rdpu(20)[c(6,8,10,14,17,12,18)],'violet',"#6A33C2", brewer.purples(10)[4:10],'black')
+names(all.clusters.cp)=levels(SetIdent(Ac.Alldata,value='ID.separate'))
+names(neur.cp)=levels(data1.subsets$neural)
+```
+
+**Aurelia Cell Atlas:**
+
+Supplementary materials in support of the conclusions drawn in Link et al. (2026), PLOS Biology. 
+<br> <br>
+
+**A single-cell transcriptomic atlas reveals the emergence of medusa-specific cell states in the scyphozoan *Aurelia coerulea* ** 
+<br><br> 
+Oliver Link1, Stefan M. Jahnel2, Kristin Janicek1, Daniel Guerguerian1, Johanna Kraus1, Juan Daniel Montenegro1, Bob Zimmerman1, Brittney Wick3, Konstantin Khalturin4, Alison G. Cole1, and Ulrich Technau1,5 
+<br> <br> <br>
+
+### **Figure S1: Life cycle: medusa genes**
+
+```{r}
+print(
+  VlnPlot(Ac.Alldata,c('nFeature_RNA','nCount_RNA'), group.by = 'lifehistory', cols= LibCP.stages)+
+  plot_annotation(tag_levels = "A")&ylab('counts'))
+metadata<-cbind(Ac.Alldata$nFeature_RNA,Ac.Alldata$nCount_RNA)
+colnames(metadata)<-c('nFeature_RNA','nCount_RNA')
+#xlsx::write.xlsx(metadata,'S4_raw.xlsx',sheetName='FigS1AB',col.names = T,row.names = T,append=T)
+
+```
+
+```{r echo=FALSE}
+medusa.specific = read.csv(file='DS1.1a.csv')
+g=medusa.specific$gene_short_name
+# sort gene.plot according to clusters with dist and hclust to get gene orders:
+data1<-ScaleData(Ac.Alldata,features=g,split.by = 'lifehistory',assay='RNA',verbose = F)
+m=AverageExpression(data1,slot = 'scale.data',assay='RNA',features=g)
+h=hclust(dist(m$RNA),method='ward.D2')
+
+#FigS1B: All medusa genes ----
+x=DotPlot(Ac.Alldata,assay='RNA',features=rev(g[h$order]),scale.by='size', dot.min = 0.001,group.by = 'ID.separate', col.min = 0,cols = c('lightgrey','red'))+RotatedAxis() +FontSize(10,5)+ labs(title='Medusa-specific genes',subtitle='all genes')+theme(legend.position = 'bottom',legend.text = (element_text(size=8)),panel.grid = element_line('grey80',linewidth = 0.2))+coord_flip()
+
+specificity.index2=  x$data %>% 
+  group_by(id) %>% 
+  filter(pct.exp >0 & avg.exp.scaled >=0)%>% 
+  count(pct.exp >0) 
+
+summary.medusa.exp=as.data.frame(levels(Ac.Alldata$ID.separate))
+summary.medusa.exp$n = 0L
+names(summary.medusa.exp)[1] = 'id'
+summary.medusa.exp$n[summary.medusa.exp$id %in% specificity.index2$id]=specificity.index2$n
+# xlsx::write.xlsx(summary.medusa.exp$n,'S4_raw.xlsx',sheetName='FigS1C',col.names = T,row.names = T,append=T)
+```
+
+```{r}
+par(mar = c(10, 4.1, 4.1, 2.1))
+barplot(summary.medusa.exp$n,
+        names.arg = summary.medusa.exp$id,
+        las = 2,
+        cex.names = 1,
+        col = all.clusters.cp[summary.medusa.exp$id],
+        ylim=c(0,500),
+        ylab='counts')
+
+title("All medusa.genes, detection / cluster")
+
+mtext("C",
+      side = 3,      # top
+      adj = -0.05,       # left align
+      line = 2,   
+      cex = 1.5,
+      font = 2)
+```
+
+Figure S1: **A**) Total number of genes (nFeatures_RNA) and **B**) molecules (nCounts_RNA) recovered from all cells captured across life cycle stages **C**) Distribution of medusa-specific genes across all cell types. The set of all medusa-specific genes were considered. For every cluster the gene is counted as expressed if reads are detected and expression value is above the average expression across all identities.
+
+<br> <br> <br> <br>
+
+### **Figure S2: Life cycle: differentially expressed genes**
+
+```{r fig.height=24, fig.width=12}
+load(file='markers.lifehistory.RObj')
+l<-round(length(unique(life.history.markers$gene))/2)
+goi=(unique(life.history.markers$gene))
+S2A<-DotPlot(SetIdent(Ac.Alldata,value='lifehistory'),assay='RNA',features=rev(goi[1:l]),split.by = 'lifehistory',cols = LibCP.stages,scale.by = 'radius',
+        col.min = 0,
+        dot.scale = 5)+DotPlot(SetIdent(Ac.Alldata,value='lifehistory'),assay='RNA',features=rev(goi[c(l+1:length(goi))]),split.by = 'lifehistory',cols = LibCP.stages,scale.by = 'radius',
+        col.min = 0,
+        dot.scale = 5)&
+  RotatedAxis()+FontSize(10,6)&theme(panel.grid = element_line(linewidth = 0.2,colour = 'grey90'),legend.title = element_text(size = 8),legend.text = element_text(size=6),legend.position = 'bottom')&coord_flip()
+#xlsx::write.xlsx(S2A@data,'S4_raw.xlsx',sheetName='FigS2A',col.names = T,row.names = T,append=T)
+S2A& plot_annotation(tag_levels = list(c("A",'')))
+```
+
+```{r fig.height=12, fig.width=12}
+load(file='lifehistory.topGO.RObj')
+S2BE=rbind(topGO.lifehistory[[1]]@data,topGO.lifehistory[[2]]@data,topGO.lifehistory[[3]]@data,topGO.lifehistory[[4]]@data)
+#xlsx::write.xlsx(S2BE,'S4_raw.xlsx',sheetName='FigS2B_E',col.names = T,row.names = T,append=T)
+topGO.lifehistory[[1]]+topGO.lifehistory[[2]]+topGO.lifehistory[[3]]+topGO.lifehistory[[4]]&
+  plot_annotation(tag_levels = list(c("B","C","D","E")))&
+  theme(
+    plot.tag = element_text(face = "bold")
+  )
+```
+
+**Fig. S2: Differential gene usage across lifecycle. A**) Dotplot of the set of deferentially expressed genes across life cycle stages. Plot split in two panels for increased legibility. **B:E**) TOP go evaluation of all differentially expressed genes across life cycle stages. See supplementary Data S1.2 for full gene lists.
+
+<br> <br> <br> <br>
+
+### **Figure S3: Full cell state complement**
+
+```{r fig.height=8}
+DimPlot(Ac.Alldata,cols=all.clusters.cp,group.by = 'ID.separate',split.by = 'lifehistory')&NoAxes() &
+  theme(legend.position = "bottom")&
+  plot_annotation(tag_levels = list("A"))
+```
+
+**Fig. S3: Full cell state complement**. UMAP representation of all cluster identities, separated by life cycle stage.
+
+<br> <br> <br> <br>
+
+### **Figure S4: Digestive Gland**
+
+```{r fig.height=5}
+data1a<-SetIdent(Ac.Alldata,value='ID.separate')
+data1<-data1.subsets$gland.dig
+ids.cluster.library = as.data.frame(table(Idents(data1), data1@meta.data$lifehistory.tissue))
+colnames(ids.cluster.library) = c('ID','Stage','CellCount')
+#xlsx::write.xlsx(ids.cluster.library,'S4_raw.xlsx',sheetName='FigS4C',col.names = T,row.names = T,append=T)
+ids<-c(52:59)
+coi=NULL
+for (i in 1:length(ids))
+coi[[i]]=WhichCells(data1a,idents=levels(data1a)[ids[i]])
+names(coi)=levels(data1a)[ids]
+p1<-(DimPlot(data1a,cells.highlight=(coi),cols.highlight = rev(clust.cp.separate[1:8]))+NoAxes()+NoLegend()+labs(subtitle = 'Alldata: Digestive cell subset'))+
+(DimPlot(data1,cols=clust.cp.separate[1:8],label=T)+NoAxes()+labs(subtitle = 'Digestive cell subtypes'))+
+    (ggplot(ids.cluster.library, aes(fill=ID, y= (CellCount),
+                                x=Stage)) +
+  geom_bar(mapping =aes(fill=ID, y= (CellCount),
+                        x=(Stage)),
+           position="stack", stat="identity", width = 0.75)+
+  scale_fill_manual(values = c(clust.cp.separate[1:8]))+
+  theme(axis.text.x = element_text( 
+    size=8, angle=-45,hjust=0,vjust = 0.5))+NoLegend()+labs(subtitle = 'Digestive cell counts / life cycle'))
+
+p3<-DotPlot(data1a,feature=c('ashC.1'),cols=c('grey','red'),col.min = 0)+
+  RotatedAxis() +theme(legend.position = 'bottom',legend.title = element_text(size=8),legend.text = element_text(size=8),panel.grid = element_line(color='grey90',linewidth = 0.2))+coord_flip()
+
+print(p1 +
+  plot_annotation(tag_levels = "A")&
+  theme(
+    plot.tag = element_text(face = "bold")
+  )) 
+```
+
+```{r fig.height=4}
+#xlsx::write.xlsx(p3@data,'S4_raw.xlsx',sheetName='FigS4D',col.names = T,row.names = T,append=T)
+print(p3+
+  plot_annotation(tag_levels = list("D")))
+```
+
+```{r fig.height=12}
+load(file = 'Ac.AllData.subsets.markers.RObj')
+
+list = NULL
+for (c in (1:length(unique((markers$gland.dig$cluster)))))
+{
+  x=markers$gland.dig[as.numeric(markers$gland.dig$cluster)==c,][1:min(10,length(which(as.numeric(markers$gland.dig$cluster)==c))),7]
+  list=c(list,x)
+}
+list=unique(list)
+list=list[!is.na(list)]
+
+p2<-  DotPlot(data1.subsets$gland.dig,'RNA', features = c(list),scale.by='radius' , col.min = 0, split.by = 'lifehistory',cols = LibCP.stages,
+          dot.min = 0.02)+
+  RotatedAxis() +FontSize(10,8) +labs(title='Top 10 DEGs / cell sub-type',subtitle = 'adj.p-val <= 0.001')+theme(legend.position = 'bottom',legend.title = element_text(size=8),legend.text = element_text(size=8),panel.grid = element_line(color='grey90',linewidth = 0.1))+coord_flip()
+#xlsx::write.xlsx(p2@data,'S4_raw.xlsx',sheetName='FigS4E',col.names = T,row.names = T,append=T)
+print(p2 +
+  plot_annotation(tag_levels = list("E")))
+```
+
+```{r fig.height = 4}
+chitinase <- png::readPNG("Chitinase.png") 
+pA <- ggplot() + annotation_custom( grid::rasterGrob(chitinase, interpolate = TRUE), xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = Inf ) + theme_void() 
+
+pA+ plot_annotation(tag_levels = list("F")) &
+  theme(
+    plot.tag = element_text(face = "bold")
+  )
+```
+
+**Figure S4: Digestive gland population**. **A**) Full dataset UMAP showing position of cluster subset **B**) UMAP distribution of identified clusters. **C**) Bar plot showing distribution of digestive gland cells across life cycle stages and medusa tissue samples as absolute cell numbers. **D**) Gene expression dot plot showing expression profile of *ashC* specifically in identified digestive gland cell subtypes. **E**) Gene expression dot plot showing expression profile of top 10 differentially expressed genes for each cluster, separated by life cycle contribution. Full gene list is available in supplementary data S1.10 **F)** *in situ* hybridization showing localization of chitinase gene expression to the gastric filaments.
+
+<br> <br> <br> <br>
+
+### **Figure S5: Mucin gland cluster**
+
+```{r fig.height=5}
+data1a<-SetIdent(Ac.Alldata,value='ID.separate')
+data1<-data1.subsets$gland.muc
+ids.cluster.library = as.data.frame(table(Idents(data1), data1@meta.data$lifehistory.tissue))
+colnames(ids.cluster.library) = c('ID','Stage','CellCount')
+#xlsx::write.xlsx(ids.cluster.library,'S4_raw.xlsx',sheetName='FigS5C',col.names = T,row.names = T,append=T)
+ids<-c(15:19)
+coi=NULL
+for (i in 1:length(ids))
+coi[[i]]=WhichCells(data1a,idents=levels(data1a)[ids[i]])
+names(coi)=levels(data1a)[ids]
+p1<-(DimPlot(data1a,cells.highlight=(coi),cols.highlight = rev(clust.cp.separate[1:5]))+NoAxes()+NoLegend()+labs(subtitle = 'Alldata: Mucin cell subset'))+
+(DimPlot(data1,cols=clust.cp.separate[1:8],label=T)+NoAxes()+labs(subtitle = 'Mucin cell subtypes'))+
+    (ggplot(ids.cluster.library, aes(fill=ID, y= (CellCount),
+                                x=Stage)) +
+  geom_bar(mapping =aes(fill=ID, y= (CellCount),
+                        x=(Stage)),
+           position="stack", stat="identity", width = 0.75)+
+  scale_fill_manual(values = c(clust.cp.separate[1:8]))+
+  theme(axis.text.x = element_text(#face="bold", color="#993333", 
+    size=8, angle=-45,hjust=0,vjust = 0.5))+NoLegend()+labs(subtitle = 'Mucin cell counts / life cycle') )
+p1+
+  plot_annotation(tag_levels = "A")&
+  theme(
+    plot.tag = element_text(face = "bold"))
+```
+
+```{r fig.height=4}
+FS5D<-DotPlot(data1a,feature=c('atoh8a','neuroD','mlp-like'),cols=c('grey','red'),col.min = 0)+
+  RotatedAxis() +theme(legend.position = 'bottom',legend.title = element_text(size=8),legend.text = element_text(size=8),panel.grid = element_line(color='grey90',linewidth = 0.2))+coord_flip()
+#xlsx::write.xlsx(FS5D@data,'S4_raw.xlsx',sheetName='FigS5D',col.names = T,row.names = T,append=T)
+FS5D+
+  plot_annotation(tag_levels = list("D"))
+```
+
+**Figure S5: Mucin gland population**. **A**) Full dataset UMAP showing position of cluster subset **B**) UMAP distribution of identified clusters. **C**) Bar plot showing distribution of mucin gland cells across life cycle stages and medusa tissue samples as absolute cell numbers. **D**) Gene expression dot plot showing expression profile of mucin-like-protein (*mlp-like*) and the bHLH transcription factor *ngn* specifically in identified mucin gland cell subtypes. One paralog of the *atoh8* gene family is also expressed specifically in mucin subtypes *mucin.3* and *mucin.medusa*.
+
+<br> <br> <br> <br>
+
+## **Figure S6: Myc gene tree**
+```{r}
+myc <- png::readPNG("myc.png")
+myc.hydra<- png::readPNG("HydraMyc.png")
+
+p6A <- ggplot() +
+  annotation_custom(
+    grid::rasterGrob(myc, interpolate = TRUE),
+    xmin = -Inf, xmax = Inf,
+    ymin = -Inf, ymax = Inf
+  ) +
+  theme_void()
+p6B <- ggplot() +
+  annotation_custom(
+    grid::rasterGrob(myc.hydra, interpolate = TRUE),
+    xmin = -Inf, xmax = Inf,
+    ymin = -Inf, ymax = Inf
+  ) +
+  theme_void()
+```
+
+```{r}
+(p6A | p6B) +
+  plot_annotation(tag_levels = "A")&
+  theme(
+    plot.tag = element_text(face = "bold")
+  )
+```
+
+**Figure S6: Cnidarian expansion of myc-family members. A**) Maximum likelihood tree; *Aurelia* is indicated in blue, *Nematostella* in salmon, other cnidarians in black and bilaterian orthologs in grey. Expression within the two shared cell type states (early and mature) as indicated in Figure 3 are plotted. Internal nodes indicate bootstrap values. Ac: *Aurelia coerulea*; Bf: *Branchiostoma floridae*; Ce: *Caenorhabditis elegans*; Cx: *Cassiopea xamachana*; Ed: *Exaiptasia diaphana*; Hs: *Homo sapiens*; Hv: *Hydra vulgaris*; Hy: *Hydractinia symbiolongicarpus*; Mg: *Magallana gigas*; Nv: *Nematostella vectensis*; Of: *Owenia fusiformis*; Re: *Rhopilema esculentum*; Sm: *Sanderia malayensis*; Sp: *Stylophora pistillata* ; Tc: *Tripedalia cystophora* **B**) Expression of included gene models on the *Hydra vulgaris* dataset (from [*https://research.nhgri.nih.gov/HydraAEP/SingleCellBrowser/*](https://research.nhgri.nih.gov/HydraAEP/SingleCellBrowser/){.uri}). <br> <br> <br> <br>
+
+### **Figure S7: Neuron GO terms**
+
+```{r fig.height=24}
+load(file='topGO.neurons.RData')
+# generate the source data:
+FS7<- do.call(cbind, lapply(topGO.IDs, slot, "data"))
+#xlsx::write.xlsx(FS7,'S4_raw.xlsx',sheetName='FigS7',col.names = T,row.names = T,append=T)
+plots=as.list(topGO.IDs)
+# plots = c(extra.element,plots)-#add something else to the empty spot but in first position...
+plots <- lapply(plots, function(p)
+  p + theme(
+    axis.title = element_blank(),
+    axis.text = element_text(size = 8)
+  )
+)
+combined <- wrap_plots(rev(plots), nrow = 8, ncol = 3)
+combined+
+  plot_annotation(tag_levels = "A")&
+  theme(
+    plot.tag = element_text(face = "bold")
+  )
+
+
+```
+
+**Figure S7: Over-represented biological processes in differential gene lists (topGO)**. Each set of up-regulated genes from all neuroglandular subtypes was evaluated for over-represented biological processes with the topGO package. Full gene lists are available in supplementary data S1.8. <br> <br> <br> <br>
+
+### **Figure S8: ATOH8 family genes**
+
+```{r fig.width=12, fig.height=14}
+atoh8= c('atoh8a','atoh8b','atoh8c','atoh8d')
+load(file='nem.neur.Robj')
+load('Genes.Nv2.RData')
+atoh8.nem=genes[match(c('NV2.6610','NV2.5283','NV2.11608'),genes$geneID),]
+rownames(atoh8.nem) = c('atoh8a','atoh8c','atoh8d')
+nem.neur.reduced=subset(nem.neur,idents=levels(nem.neur)[c(2:4,6:10,13:21,23,39:46)])
+data.ac<-SetIdent(Ac.Alldata,value='ID.separate')
+p <-DotPlot(Ac.Alldata,'RNA', features=c(atoh8),scale.by='size' ,dot.min = 0.01, col.min = 0,cols = c('lightgrey','black'))+RotatedAxis()+ labs(title='Aurelia all data',subtitle = 'atoh8-like')+theme(legend.position = 'bottom',legend.text = (element_text(size=8)),panel.grid = element_line(color='grey90',linewidth = 0.2))+coord_flip()
+
+p.a<-DotPlot(data.ac,'RNA', features=c(atoh8),scale.by='size' ,dot.min = 0.01, col.min = 0, idents=levels(data.ac)[c(20:42)],cols = c('lightgrey','steelblue'))+RotatedAxis()+ labs(title='Aurelia all neurons',subtitle = 'atoh8-like')+theme(legend.position = 'bottom',legend.text = (element_text(size=8)),panel.grid = element_line('black',linewidth = 0.1))+coord_flip()
+
+p.n<-DotPlot(nem.neur.reduced,'RNA', features=atoh8.nem$gene_short_name,scale.by='size' ,dot.min = 0.01,group.by = 'IDs', col.min = 0,cols = c('lightgrey','red'))+RotatedAxis() + labs(title='Nematostella all neurons',subtitle = 'atoh8-like')+theme(legend.position = 'bottom',legend.text = (element_text(size=8)),panel.grid = element_line(color='grey90',linewidth = 0.2))+coord_flip()+ scale_x_discrete(labels = rownames(atoh8.nem))
+#xlsx::write.xlsx(p@data,'S4_raw.xlsx',sheetName='FigS8A',col.names = T,row.names = T,append=T)
+#xlsx::write.xlsx(p.a@data,'S4_raw.xlsx',sheetName='FigS8B',col.names = T,row.names = T,append=T)
+#xlsx::write.xlsx(p.n@data,'S4_raw.xlsx',sheetName='FigS8C',col.names = T,row.names = T,append=T)
+print(p / p.a / p.n +
+  plot_annotation(tag_levels = "A"))
+```
+
+```{r fig.width=12}
+p.h<- png::readPNG("hy.neuro.atoh8.png")
+pD <- ggplot() +
+  annotation_custom(
+    grid::rasterGrob(p.h, interpolate = TRUE),
+    xmin = -Inf, xmax = Inf,
+    ymin = -Inf, ymax = Inf
+  ) +
+  theme_void()+labs(title = 'Hydra all neurons',subtitle='https://cejuliano.shinyapps.io/HydraAtlas/',)+theme(plot.title = element_text(face = "bold"))
+img <- png::readPNG("atoh8.png")
+pA <- ggplot() +
+  annotation_custom(
+    grid::rasterGrob(img, interpolate = TRUE),
+    xmin = -Inf, xmax = Inf,
+    ymin = -Inf, ymax = Inf
+  ) +
+  theme_void()
+# print(pA+
+#   plot_annotation(tag_levels = list("E"))) 
+(pD | pA) +
+  plot_annotation(tag_levels = list(c("D","E")))&
+  theme(
+    plot.tag = element_text(face = "bold")
+  )
+```
+
+**Figure. S8**: Expression of atoh8 family transcription factors. **A**) Expression profiles across all identified cell type families of each member of the atoh8 family. **B:D**) Expression profiles of atoh8 family genes within the neural clusters of *Aurelia* (B), *Nematostella* (C), and *Hydra* (D) highlights both broad expression profiles, as well as cell type specific expression. Expression of included gene models on the *Hydra vulgaris* dataset (from [*https://research.nhgri.nih.gov/HydraAEP/SingleCellBrowser/*](https://research.nhgri.nih.gov/HydraAEP/SingleCellBrowser/){.uri}). G023106 is the hydra *pou4* ortholog indicating class n2-type neurons, and G017257 is the *ins* ortholog, indicating class n1-type neurons. **E**) Gene family tree with *Nematostella* (salmon), *Aurelia* (blue), *Hydra* (blue-green) and human (red) paralogs highlighted. Internal nodes indicate bootstrap values. Ac: *Aurelia coerulea*; Bf: *Branchiostoma floridae*; Ce: *Caenorhabditis elegans*; Cx: *Cassiopea xamachana*; Ed: *Exaiptasia diaphana*; Hs: *Homo sapiens*; Hv: *Hydra vulgaris*; Hy: *Hydractinia symbiolongicarpus*; Mg: *Magallana gigas*; Nv: *Nematostella vectensis*; Of: *Owenia fusiformis*; Re: *Rhopilema esculentum*; Sm: *Sanderia malayensis*; Sp: *Stylophora pistillata* ; Tc: *Tripedalia cystophora* <br> <br> <br> <br>
+
+### **Figure S9: Muscle Transcription Factors**
+
+```{r fig.height=4}
+load(file='all.idents.markers.RData')
+FS9<-DotPlot(Ac.Alldata,features=all.markers.TF.allidents$gene[c(7:12)],cols=c('grey','red'),col.min = 0, dot.min = 0.1,group.by = "ID.separate")+
+  RotatedAxis() +theme(legend.position = 'bottom',legend.title = element_text(size=8),legend.text = element_text(size=8),panel.grid = element_line(color='grey90',linewidth = 0.2))+coord_flip()
+#xlsx::write.xlsx(FS9@data,'S4_raw.xlsx',sheetName='FigS9',col.names = T,row.names = T,append=T)
+FS9
+```
+
+**Figure S9:** **Muscle-specific transcription factors.** Dotplot of expression of the top differentially expressed gene models with DNA binding sites specific to the striated muscle subset. Full gene list is available in supplementary Data S1.4b.
